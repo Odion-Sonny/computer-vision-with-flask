@@ -71,7 +71,7 @@ With our virtual environment created and activated, we can now install Flask, th
 The `requirements.txt` file isn't special in and of itself; it's a text file where we list the libraries required for our application. But it's the convention typically used by developers, and makes it easier to manage applications where numerous libraries are dependencies.
 
 
-During later exercises, we'll use a couple of other libraries, including `requests` (to call Translator service) and `python-dotenv` (to manage our keys). While we don't need them yet, we're going to make our lives a little easier by installing them now.
+During later exercises, we'll use a couple of other libraries, including `requests` (to call Computer vision service) and `python-dotenv` (to manage our keys). While we don't need them yet, we're going to make our lives a little easier by installing them now.
 
 - Open the folder in Visual Studio Code.
 
@@ -155,3 +155,293 @@ Templates for Flask need to be created in a folder named templates, which is fit
 3. Name the file `index.html`
 
 4. Add the following HTML
+```
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Extract Text from Image</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <h1 class="jumbotron bg-primary">Extract Text from Image</h1>
+  <br><br>
+  <form class="form-horizontal" action="/submit" method="post" enctype="multipart/form-data">
+
+    <div class="form-group">
+      <label class="control-label col-sm-2" for="pwd">Upload Your Image :</label>
+      <div class="col-sm-10">          
+        <input type="text" class="form-control" placeholder="Image URL"  name="image_url" id="pwd">
+      </div>
+    </div>
+
+    <div class="form-group">        
+      <div class="col-sm-offset-2 col-sm-10">
+        <button type="submit" class="btn btn-success">Submit</button>
+      </div>
+    </div>
+  </form>
+
+	{% if prediction %}
+    <h2> Predicted Text: </h2> 
+    <h3 style="background-color: LightGray; padding: 70px 35px;">  {{prediction}} </h3>
+    <h2>Image:</h2>
+    <img src="{{img_path}}" height="400px" width="400px">
+	{% endif %}
+
+</div>
+</body>
+</html>
+```
+### Test the application
+
+With our initial site created, it's time to test it!
+
+- Open your terminal. 
+
+- Run the following command to set the Flask runtime to development, which means that the server will automatically reload with every change:
+
+```
+# Windows
+set FLASK_ENV=development
+
+# Linux/macOS
+export FLASK_ENV=development
+```
+
+- Run the application!
+```
+flask run
+```
+
+Open the application in a browser by navigating to http://localhost:5000
+
+You should see the form displayed! Congratulations!
+
+## Create the Computer vision service
+
+Once the project is up and running, we will create the necessary services on Azure. We'll obtain the necessary keys to call the service, and properly store them in a .env file.
+
+1. Get Computer vision service key
+
+2. Create .env file to store the key
+
+### Get Computer vision service key 
+
+- Browse to the [Azure portal](https://portal.azure.com/#home)
+
+- Select `Create a resource`
+
+![image](https://user-images.githubusercontent.com/64667212/180775259-95f3efd7-447d-4a5e-b1d6-a6a11ee209ef.png)
+
+- In the `Search` box, enter `Computer vision`
+
+- Select `Computer vision`
+
+- Select `Create`
+
+
+- Complete the Create Computer vision form with the following values:
+
+```
+Subscription: Your subscription
+Resource group:
+Select Create new
+Name: flask-ai
+Resource group region: Select a region near you
+Resource region: Select the same region as above
+Name: A unique value, such as ai-yourname
+Pricing tier: Free F0 
+```
+
+- Select `Review + create`
+
+- Select `Create`
+
+- After a few moments the resource will be created
+
+- Select `Go to resource`
+
+- Select `Keys and Endpoint` on the left side under `RESOURCE MANAGEMENT`
+
+- Next to `KEY 1`, select `Copy to clipboard`
+
+![image](https://user-images.githubusercontent.com/64667212/180775981-94e57a72-84cc-46b0-9721-6df1eccc0fb4.png)
+
+Note: There's no difference between Key 1 and Key 2. By providing two keys you have the opportunity to migrate to new keys, by regenerating one while using the other.
+
+### Create .env file to store the key
+
+- Return to Visual Studio Code and create a new file in the root of the application by selecting New file and naming it `.env`
+
+- Paste the following text into .env
+
+```
+KEY=your_key
+ENDPOINT=your_endpoint
+```
+- Replace the placeholders
+
+your_key with the key you copied above
+your_endpoint with the endpoint from Azure
+your_location with the location from Azure
+
+- our .env file should look like the following (with your values):
+
+```
+KEY=00d09299d68548d646c097488f7d9be9
+ENDPOINT=https://api.cognitiveservices.azure.com/
+```
+
+
+### Add code to call the service
+
+app.py contains the logic for our application. We'll add a couple of required imports for the libraries we'll use, followed by the new route to respond to the user.
+
+- At the very top of app.py, add the following lines of code:
+```
+from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
+from msrest.authentication import CognitiveServicesCredentials
+import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+```
+The top line will import libraries that we'll use later, when making the call to the Computer vision service. We also import `load_dotenv` from `dotenv` and execute the function, which will load the values from .env.
+
+- At the bottom of app.py, add the following lines of code to create the route and logic for extracting text:
+```
+# Load the values from .env
+subscription_key = os.getenv('subscription_key')
+endpoint = os.getenv('endpoint')
+
+# create a computer vision client instance
+computervision_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(subscription_key))
+
+def extractTextFromImage(image_url):
+
+	response = computervision_client.read(url=image_url, language='en', raw=True)
+
+	# Get the operation location (URL with an ID at the end) from the response
+	read_operation_location = response.headers['Operation-Location']
+
+	# Grab the ID from the URL
+	operation_id = read_operation_location.split('/')[-1]
+
+	read_result = computervision_client.get_read_result(operation_id)
+	
+	# Call the "GET" API and wait for it to retrieve the results
+	while True:
+			read_result = computervision_client.get_read_result(operation_id)
+			if read_result.status not in ['notStarted', 'running']:
+				break
+			time.sleep(1)
+
+	# create a variable to store result		
+	result = ''
+
+	# Add the detected text to result, line by line
+	if read_result.status == OperationStatusCodes.succeeded:
+			for text_result in read_result.analyze_result.read_results:
+				for line in text_result.lines:
+					result = result + " " + line.text
+	return result
+```
+
+
+### Add a route to `app.py`
+Create a route in your Flask app that calls the extractTextFromImage function whenever users submit an image URL. Then render_template to show the returned result.
+```
+@app.route("/submit", methods = ['GET', 'POST'])
+def get_output():
+	if request.method == 'POST':
+		image_url = request.form.get('image_url')
+
+	result = extractTextFromImage(image_url)
+
+	return render_template("index.html", prediction = result, img_path = image_url)
+```
+
+Now the web app is ready. The `app.py` file will look like this-
+```
+from flask import Flask, render_template, request
+from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
+from msrest.authentication import CognitiveServicesCredentials
+import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = Flask(__name__)
+
+# Load the values from .env
+subscription_key = os.getenv('subscription_key')
+endpoint = os.getenv('endpoint')
+
+computervision_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(subscription_key))
+
+def extractTextFromImage(image_url):
+
+	response = computervision_client.read(url=image_url, language='en', raw=True)
+
+	# Get the operation location (URL with an ID at the end) from the response
+	read_operation_location = response.headers['Operation-Location']
+
+	# Grab the ID from the URL
+	operation_id = read_operation_location.split('/')[-1]
+
+	read_result = computervision_client.get_read_result(operation_id)
+	
+	# Call the "GET" API and wait for it to retrieve the results
+	while True:
+			read_result = computervision_client.get_read_result(operation_id)
+			if read_result.status not in ['notStarted', 'running']:
+				break
+			time.sleep(1)
+
+	# create a variable to store result		
+	result = ''
+
+	# Add the detected text to result, line by line
+	if read_result.status == OperationStatusCodes.succeeded:
+			for text_result in read_result.analyze_result.read_results:
+				for line in text_result.lines:
+					result = result + " " + line.text
+	return result
+
+
+# routes
+@app.route("/", methods=['GET', 'POST'])
+def main():
+	return render_template("index.html")
+
+
+
+@app.route("/submit", methods = ['GET', 'POST'])
+def get_output():
+	if request.method == 'POST':
+		image_url = request.form.get('image_url')
+
+	result = extractTextFromImage(image_url)
+
+	return render_template("index.html", prediction = result, img_path = image_url)
+```
+
+### Test our application
+
+- Use Ctrl-C to stop the Flask application
+
+- Execute the command flask run to restart the service
+
+- Browse to http://localhost:5000 to test your application
+
+- Enter image url into text area and select Submit.
