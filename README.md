@@ -319,8 +319,8 @@ The top line will import libraries that we'll use later, when making the call to
 - At the bottom of app.py, add the following lines of code to create the route and logic for extracting text:
 ```
 # Load the values from .env
-subscription_key = os.getenv('subscription_key')
-endpoint = os.getenv('endpoint')
+subscription_key = os.getenv('KEY')
+endpoint = os.getenv('ENDPOINT')
 
 # create a computer vision client instance
 computervision_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(subscription_key))
