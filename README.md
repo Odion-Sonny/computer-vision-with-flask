@@ -1,4 +1,4 @@
-# Build an AI web app to Extract Text From Image using Flask and Azure’s Computer Vision API
+# Build an AI web app to Extract Text From Images using Flask and Azure Computer Vision API
 
 ## Learning objectives
 
