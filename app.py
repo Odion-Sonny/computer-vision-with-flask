@@ -7,7 +7,6 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-
 app = Flask(__name__)
 
 # Load the values from .env
@@ -17,6 +16,7 @@ endpoint = os.getenv('ENDPOINT')
 # create a computer vision client instance
 computervision_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(subscription_key))
 
+# Function to extract text from image
 def extractTextFromImage(image_url):
 
 	response = computervision_client.read(url=image_url, language='en', raw=True)
@@ -37,22 +37,19 @@ def extractTextFromImage(image_url):
 			time.sleep(1)
 
 	# create a variable to store result		
-	result = ''
+	output = ''
 
 	# Add the detected text to result, line by line
 	if read_result.status == OperationStatusCodes.succeeded:
 			for text_result in read_result.analyze_result.read_results:
 				for line in text_result.lines:
 					result = result + " " + line.text
-	return result
-
+	return output
 
 # routes
 @app.route("/", methods=['GET', 'POST'])
 def main():
 	return render_template("index.html")
-
-
 
 @app.route("/submit", methods = ['GET', 'POST'])
 def get_output():
