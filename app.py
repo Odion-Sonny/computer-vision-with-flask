@@ -11,6 +11,7 @@ app = Flask(__name__)
 
 # Load the values from .env
 subscription_key = os.getenv('KEY')
+
 endpoint = os.getenv('ENDPOINT')
 
 # create a computer vision client instance
@@ -37,20 +38,20 @@ def extractTextFromImage(image_url):
 			time.sleep(1)
 
 	# create a variable to store result		
-	output = ''
+	result = ''
 
 	# Add the detected text to result, line by line
 	if read_result.status == OperationStatusCodes.succeeded:
 			for text_result in read_result.analyze_result.read_results:
 				for line in text_result.lines:
 					result = result + " " + line.text
-	return output
+	return result
 
 # routes
 @app.route("/", methods=['GET', 'POST'])
 def main():
 	return render_template("index.html")
-
+# routes
 @app.route("/submit", methods = ['GET', 'POST'])
 def get_output():
 	if request.method == 'POST':
